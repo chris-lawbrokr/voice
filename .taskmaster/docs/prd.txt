@@ -1,0 +1,281 @@
+<context>
+# Overview
+
+Voice is an AI-powered outbound calling system for law firms. It automates lead outreach by receiving trigger events from an existing Rails application, building personalized AI chatbot scripts based on lead and law firm details, placing calls via Vapi, and processing call outcomes back into the database.
+
+The system is a FastAPI service that sits between the existing Rails storefront application and Vapi's AI calling platform. It orchestrates the full lifecycle: receive lead → build chatbot → place call → process results → update lead.
+
+# Core Features
+
+## 1. Call Initiation Endpoint
+- Receives webhook from Rails with lead details, law firm context, and campaign info
+- Validates the request, checks for duplicate/active calls (idempotency)
+- Builds a dynamic chatbot prompt tailored to the lead's specifics (name, case type, source, firm branding)
+- Creates a Vapi call via their API
+- Returns call ID for tracking
+
+## 2. Dynamic Chatbot Builder
+- Constructs conversation scripts from lead + law firm data
+- Supports different call types: initial outreach, follow-up, appointment scheduling
+- Configurable tone, script flow, and firm-specific messaging
+- Uses Claude or GPT as the backing LLM through Vapi's bring-your-own-LLM support
+
+## 3. Call Webhook Processing
+- Receives post-call webhooks from Vapi (transcript, recording, duration, status)
+- Parses transcripts using Claude API to extract structured data:
+  - Call outcome (interested, not interested, voicemail, no answer, callback requested)
+  - Lead qualification details
+  - Key information mentioned by the lead
+  - Suggested next steps
+- Updates the lead record in Postgres with call results
+- Triggers callback to Rails API to notify of completion
+
+## 4. Call State Management
+- Tracks all calls: initiated, in_progress, completed, failed
+- Stores transcripts, recordings URLs, outcomes
+- Prevents duplicate calls to the same lead within a configurable window
+- Retry logic for failed calls
+
+# User Experience
+
+## Personas
+- **Rails Application**: The primary "user" — triggers calls via API and receives results
+- **Law Firm Admin**: Views call outcomes in the existing Rails storefront UI (not built in this service)
+- **Lead (Call Recipient)**: Receives the AI-powered phone call
+
+## Key Flows
+1. Rails sends POST to FastAPI with lead details → call is placed automatically
+2. Lead answers → AI chatbot converses based on dynamic script
+3. Call ends → Vapi sends webhook → FastAPI processes and updates DB
+4. Rails queries call status/results as needed
+</context>
+<PRD>
+# Technical Architecture
+
+## System Components
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
+│  Rails API   │────▶│   FastAPI (voice) │────▶│    Vapi      │
+│  (existing)  │◀────│   GCP Cloud Run   │◀────│  (calling)   │
+└─────────────┘     └──────────────────┘     └─────────────┘
+                           │    ▲                    │
+                           │    │                    │
+                           ▼    │                    ▼
+                    ┌──────────────────┐     ┌─────────────┐
+                    │   PostgreSQL      │     │  Claude API  │
+                    │   (existing)      │     │  (LLM)       │
+                    └──────────────────┘     └─────────────┘
+```
+
+## API Endpoints
+
+### POST /api/v1/calls/initiate
+Receives call request from Rails.
+- Auth: API key in header (shared secret between Rails and FastAPI)
+- Body: lead_id, law_firm_id, campaign_id, trigger_event, lead details (name, phone, case_type, source, etc.)
+- Response: { call_id, status: "initiated" }
+- Idempotency: Rejects if active call exists for same lead_id within configurable window
+
+### POST /api/v1/calls/webhook
+Receives post-call data from Vapi.
+- Auth: Vapi webhook signature verification
+- Body: Vapi webhook payload (call_id, transcript, recording_url, duration, status, etc.)
+- Processing: Background task parses transcript, extracts structured data, updates DB
+- Response: 200 OK (fast response, processing happens async)
+
+### GET /api/v1/calls/{call_id}
+Returns call status and details.
+- Auth: API key
+- Response: call record with status, transcript, outcome, structured data
+
+### GET /api/v1/calls/lead/{lead_id}
+Returns call history for a lead.
+- Auth: API key
+- Response: list of calls for the lead
+
+### POST /api/v1/calls/{call_id}/retry
+Retry a failed call.
+- Auth: API key
+- Response: new call_id
+
+## Data Models
+
+### New Table: calls
+- id (uuid, primary key)
+- lead_id (bigint, FK to leads)
+- law_firm_id (bigint, FK to law_firms)
+- campaign_id (bigint, FK to campaigns, nullable)
+- vapi_call_id (string, Vapi's call identifier)
+- status (enum: initiated, ringing, in_progress, completed, failed, no_answer, voicemail)
+- call_type (enum: initial_outreach, follow_up, appointment)
+- prompt_used (text, the chatbot prompt that was built)
+- transcript (text, full call transcript)
+- recording_url (string, URL to call recording)
+- duration_seconds (integer)
+- outcome (enum: interested, not_interested, voicemail_left, no_answer, callback_requested, wrong_number, do_not_call)
+- extracted_data (jsonb, structured data from transcript parsing)
+- error_message (text, if call failed)
+- initiated_at (timestamp)
+- connected_at (timestamp)
+- completed_at (timestamp)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+### New Table: call_configs
+- id (uuid, primary key)
+- law_firm_id (bigint, FK to law_firms)
+- call_type (enum)
+- system_prompt_template (text, Jinja2 or similar template)
+- voice_id (string, Vapi voice identifier)
+- llm_model (string, e.g. "claude-sonnet-4-6")
+- max_duration_seconds (integer, default 300)
+- retry_attempts (integer, default 2)
+- retry_delay_minutes (integer, default 60)
+- active (boolean)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+## Services Layer
+
+### chatbot.py — Prompt Builder
+- Takes lead details + law firm config + call_config template
+- Renders a personalized system prompt
+- Includes: lead name, case type, firm name, key talking points, qualification questions
+- Returns structured Vapi assistant config (prompt + voice + model + tools)
+
+### calling.py — Vapi Client
+- Async httpx client wrapping Vapi's REST API
+- create_call(phone_number, assistant_config) → vapi_call_id
+- get_call(vapi_call_id) → call details
+- Handles rate limiting and retries
+
+### post_call.py — Transcript Processor
+- Receives raw transcript from Vapi webhook
+- Calls Claude API to extract structured data:
+  - Call outcome classification
+  - Lead sentiment and interest level
+  - Key information (preferred callback time, questions asked, concerns)
+  - Recommended next action
+- Updates the calls table and the leads table in Postgres
+- Sends callback notification to Rails API
+
+### auth.py — Authentication
+- API key validation for Rails→FastAPI communication
+- Vapi webhook signature verification
+
+## Infrastructure
+
+- **Runtime**: GCP Cloud Run (already planned)
+- **Database**: Existing PostgreSQL at 35.225.236.215
+- **Secrets**: GCP Secret Manager for DATABASE_URL, VAPI_API_KEY, ANTHROPIC_API_KEY, RAILS_API_KEY
+- **Monitoring**: Cloud Run logs + structured logging in FastAPI
+
+## External Dependencies
+- **Vapi API**: For placing calls, managing assistants, receiving webhooks
+- **Anthropic Claude API**: For post-call transcript analysis
+- **Existing Rails API**: For receiving callbacks with call results
+
+# Development Roadmap
+
+## Phase 1: Core Infrastructure (Foundation)
+- New database tables (calls, call_configs) via Alembic migration
+- API key authentication middleware
+- Health check and basic project structure (already done)
+- Pydantic schemas for all request/response models
+- Basic error handling and structured logging
+
+## Phase 2: Call Initiation
+- POST /api/v1/calls/initiate endpoint
+- Vapi client service (calling.py)
+- Basic chatbot prompt builder with a hardcoded template
+- Idempotency check (no duplicate active calls)
+- Call record creation in DB
+
+## Phase 3: Webhook Processing
+- POST /api/v1/calls/webhook endpoint
+- Vapi webhook signature verification
+- Call status update handling (ringing, in_progress, completed, failed)
+- Raw transcript and recording URL storage
+
+## Phase 4: Transcript Analysis
+- Claude API integration for transcript parsing
+- Structured data extraction (outcome, sentiment, key info)
+- Lead record updates based on call results
+- Rails callback notification
+
+## Phase 5: Dynamic Chatbot Configuration
+- call_configs table and management
+- Template-based prompt rendering (per law firm, per call type)
+- Voice selection per firm
+- LLM model selection per config
+
+## Phase 6: Call Management
+- GET /api/v1/calls/{call_id} endpoint
+- GET /api/v1/calls/lead/{lead_id} endpoint
+- POST /api/v1/calls/{call_id}/retry endpoint
+- Automatic retry logic for failed calls
+
+## Phase 7: Production Hardening
+- Rate limiting on endpoints
+- Comprehensive error handling and alerting
+- Dockerfile optimization for Cloud Run
+- Cloud Build / deployment pipeline
+- Monitoring and structured logging
+
+# Logical Dependency Chain
+
+1. **Database tables** → everything depends on having the calls and call_configs tables
+2. **Auth middleware** → all endpoints need authentication
+3. **Pydantic schemas** → endpoints and services need typed models
+4. **Vapi client** → call initiation depends on this
+5. **Call initiation endpoint** → first working feature, proves the pipeline works end-to-end with Vapi
+6. **Webhook endpoint** → receive call results (can test with Vapi test calls)
+7. **Transcript analysis** → depends on webhooks working and having real transcripts
+8. **Dynamic chatbot config** → enhances the basic prompt builder from Phase 2
+9. **Call management endpoints** → read-only endpoints, lowest priority
+10. **Retry logic** → depends on call state management being solid
+
+The fastest path to something testable: Phase 1 → Phase 2 → make a real test call via Vapi → Phase 3 → see the full loop working.
+
+# Risks and Mitigations
+
+## Technical Risks
+- **Vapi API changes**: Pin to a specific API version, wrap all calls in the service layer
+- **Call latency**: The prompt building must be fast (<500ms) or Vapi will timeout. Keep prompts pre-renderable, avoid DB queries in the hot path
+- **Webhook reliability**: Vapi may retry webhooks — handle idempotently using vapi_call_id
+- **Transcript parsing accuracy**: Claude may extract incorrect data — store raw transcripts alongside parsed data for human review
+
+## MVP Scope
+- Phase 1-3 is the MVP: initiate a call, receive results, store them
+- Phase 4 (transcript analysis) is the first high-value add-on
+- Phase 5+ can be iterated on based on law firm feedback
+
+## Resource Constraints
+- Single FastAPI service on Cloud Run — if call volume is high (>100 concurrent), may need to separate webhook processing into a worker queue
+- Vapi has rate limits — need to handle backpressure from Rails if many calls are triggered at once
+
+# Appendix
+
+## Vapi Integration Details
+- API docs: https://docs.vapi.ai
+- Create outbound call: POST https://api.vapi.ai/call/phone
+- Webhook events: call.started, call.ended, call.transcript
+- Assistant config includes: model, voice, system prompt, tools (function calling)
+
+## Environment Variables Required
+- DATABASE_URL: PostgreSQL connection string
+- VAPI_API_KEY: Vapi API key for placing calls
+- VAPI_WEBHOOK_SECRET: For verifying webhook signatures
+- ANTHROPIC_API_KEY: For Claude transcript analysis
+- RAILS_API_URL: Base URL for Rails callback notifications
+- RAILS_API_KEY: Shared secret for Rails callbacks
+- API_KEY: Shared secret that Rails uses to authenticate with this service
+
+## Existing Database Context
+The PostgreSQL database is the storefront_staging database with 59 tables. Key tables this service interacts with:
+- leads: Lead records with contact info, case details, status
+- law_firms: Law firm configuration and details
+- campaigns: Marketing campaign records
+- users: User accounts (law firm staff)
+</PRD>
