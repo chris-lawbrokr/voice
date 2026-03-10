@@ -1,25 +1,41 @@
-# ignore all hidden
-.*
-# except
-!.gitattributes
-!.gitignore
-!.gitmodules
-!.github
-!.github/**
-!.yamlfmt.yaml
-!.yamllint.yml
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
 
-# Logs
-logs
-*.log*
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.egg-info/
 
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
 *.sw?
 
-# AI tools
+# Logs
+logs/
+*.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AI tools config (track these)
 !.serena
 !.claude
 !.taskmaster
+!.github
+
+# Secrets
+*.pem
+service-account-key.json

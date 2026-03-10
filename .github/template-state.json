@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "upstream_repo": "serpro69/claude-starter-kit",
+  "template_version": "v0.2.1",
+  "synced_at": "2026-03-10T22:31:00Z",
+  "variables": {
+    "PROJECT_NAME": "voice",
+    "LANGUAGES": "typescript,python",
+    "CC_MODEL": "default",
+    "CC_STATUSLINE": "enhanced",
+    "SERENA_INITIAL_PROMPT": "",
+    "TM_CUSTOM_SYSTEM_PROMPT": "",
+    "TM_APPEND_SYSTEM_PROMPT": "",
+    "TM_PERMISSION_MODE": "default"
+  }
+}

@@ -1,29 +1,55 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Overview
 
-## Repository Overview
+**voice** is a monorepo with two services:
 
-This is a starter template repository providing a complete development environment for Claude Code with pre-configured MCP servers and tools. It is a **configuration-only repository** with no application code.
+1. **frontend/** — Next.js app (TypeScript, App Router), deployed to Vercel
+2. **api/** — FastAPI app (Python), deployed to GCP Cloud Run, connected to an existing PostgreSQL database
 
 ## Architecture
 
-Three integrated MCP server configurations:
+```
+voice/
+├── frontend/          # Next.js (Vercel)
+│   ├── src/app/       # App Router pages and layouts
+│   ├── src/components/
+│   ├── src/lib/       # Utilities, API client
+│   └── package.json
+├── api/               # FastAPI (GCP Cloud Run)
+│   ├── app/
+│   │   ├── main.py    # FastAPI app entry point
+│   │   ├── routers/   # API route modules
+│   │   ├── models/    # SQLAlchemy ORM models
+│   │   ├── schemas/   # Pydantic request/response schemas
+│   │   └── core/      # Config, database connection, dependencies
+│   ├── pyproject.toml
+│   └── Dockerfile
+├── .claude/           # Claude Code settings, skills, commands
+├── .serena/           # Serena LSP config (typescript + python)
+└── .taskmaster/       # Task Master config
+```
 
-1. **Claude Code** (`.claude/`): Permission allowlist/denylist (`settings.local.json`), 50+ Task Master slash commands (`commands/tm/`), command reference (`TM_COMMANDS_GUIDE.md`)
-2. **Serena** (`.serena/`): Semantic code analysis via LSP — language detection, gitignore integration, tool exclusions (`project.yml`)
-3. **Task Master** (`.taskmaster/`): AI-powered task management — model config (`config.json`), integration guide (`CLAUDE.md`), PRD template (`templates/example_prd.txt`)
+## Development Commands
 
-For API keys and MCP server setup, see the "MCP Server Configuration" section in `README.md`.
+### Frontend
+```bash
+cd frontend && npm run dev      # Dev server on :3000
+cd frontend && npm run build    # Production build
+cd frontend && npm run lint     # ESLint
+```
+
+### API
+```bash
+cd api && uv run uvicorn app.main:app --reload   # Dev server on :8000
+cd api && uv run pytest                           # Run tests
+```
 
 ## Claude-Code Behavioral Instructions
 
 ### Exploration Phase
 
 Always explore on your own to gain complete understanding. Only delegate to exploration agents if the user explicitly requests it.
-<!-- Why: Claude tends to first spawn exploration agents,
-     and then re-reads all the files on its own...
-     resulting in double token consumption -->
 
 ## Serena Best Practices
 
@@ -53,30 +79,20 @@ Symbols are identified by `name_path` and `relative_path`:
 - Track which symbols you've read and reuse that context
 - Use symbolic tools before reading full files
 
-## Task Master Integration
+## Key Conventions
 
-Task Master is the primary workflow orchestration system. Always prefer MCP tools over CLI commands — the permission configuration enforces this by denying `Bash(task-master:*)`.
+- **Git commits**: Use conventional commits with scope: `feat(api): add user endpoint`, `fix(frontend): form validation`
+- **API communication**: Frontend calls API via `NEXT_PUBLIC_API_URL` env var
+- **Database**: Existing PostgreSQL — do NOT create migration scripts that drop/recreate existing tables. Use Alembic for additive migrations only.
+- **Environment variables**: Never commit `.env` files. Use `.env.example` as templates.
+- **Python deps**: Managed with `uv` (pyproject.toml), not pip
+- **Node deps**: Managed with `npm` (package.json)
 
-### Slash Command Structure
+## Deployment
 
-Commands are organized under `/project:tm/[category]/[action]`:
-
-- Setup: `/project:tm/setup/quick-install`, `/project:tm/init/quick`
-- Daily: `/project:tm/next`, `/project:tm/list`, `/project:tm/show <id>`
-- Status: `/project:tm/set-status/to-{done|in-progress|review|pending|deferred|cancelled} <id>`
-- Analysis: `/project:tm/analyze-complexity`, `/project:tm/expand <id>`
-- Workflows: `/project:tm/workflows/smart-flow`, `/project:tm/workflows/auto-implement`
-
-### Working with Tasks
-
-1. Parse requirements: `/project:tm/parse-prd .taskmaster/docs/prd.txt`
-2. Analyze complexity: `/project:tm/analyze-complexity --research`
-3. Expand tasks: `/project:tm/expand/all`
-4. Get next task: `/project:tm/next`
-5. Update progress: Use MCP `update_subtask` to log implementation notes
-6. Complete: `/project:tm/set-status/to-done <id>`
-
-See `.taskmaster/CLAUDE.md` for the complete 400+ line Task Master integration guide.
+- **Frontend**: Vercel auto-deploys from `main` branch. Root directory set to `frontend/`.
+- **API**: GCP Cloud Run via `gcloud run deploy` or Cloud Build. Dockerfile in `api/`.
+- **Database**: Existing PostgreSQL instance — connection via `DATABASE_URL` secret.
 
 ## Project Rules
 
@@ -88,7 +104,7 @@ See `.taskmaster/CLAUDE.md` for the complete 400+ line Task Master integration g
 
 ### Permission Configuration
 
-See `.claude/settings.local.json` for the full tool allowlist/denylist.
+See `.claude/settings.json` for the full tool allowlist/denylist.
 
 ### Context Management
 
@@ -96,40 +112,26 @@ See `.claude/settings.local.json` for the full tool allowlist/denylist.
 - This CLAUDE.md is automatically loaded
 - Task Master commands pull task context on demand
 
-### Git Integration
-
-- Serena respects `.gitignore` by default
-- Use conventional commits with task IDs: `feat: implement JWT auth (task 1.2)`
-
 ### Template Sync
 
 - `.github/template-state.json` tracks template version and configuration variables
 - Use Actions → Template Sync to pull upstream configuration updates
 - Always review PR changes before merging to preserve local customizations
-- Sync preserves project-specific values (name, language, prompts) via manifest variables
-- User-scoped files like `.taskmaster/tasks/`, `.taskmaster/docs/`, and `.taskmaster/reports/` are never modified
 
-### Sync Exclusions
+## Task Master Integration
 
-- Add `sync_exclusions` array to `.github/template-state.json` to prevent specific paths from being synced
-- Patterns use glob syntax (e.g., `.claude/commands/cove/*`)
-- See README.md "Configuring Sync Exclusions" section for details
+Task Master is the primary workflow orchestration system. Always prefer MCP tools over CLI commands.
 
-## Testing
+### Working with Tasks
 
-Tests for the template-sync feature are in `test/`. Run with:
+1. Parse requirements: `/project:tm/parse-prd .taskmaster/docs/prd.txt`
+2. Analyze complexity: `/project:tm/analyze-complexity --research`
+3. Expand tasks: `/project:tm/expand/all`
+4. Get next task: `/project:tm/next`
+5. Update progress: Use MCP `update_subtask` to log implementation notes
+6. Complete: `/project:tm/set-status/to-done <id>`
 
-```bash
-for test in test/test-*.sh; do $test; done
-```
-
-Tests use shared utilities from `test/helpers.sh`. See that file for available assertions and helpers.
-
-## Troubleshooting
-
-See `README.md` for detailed troubleshooting of MCP connection issues, Task Master AI failures, Serena language detection, and template sync problems.
-
-## Task Master AI Instructions
+See `.taskmaster/CLAUDE.md` for the complete Task Master integration guide.
 
 **IMPORTANT!!! Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
 
