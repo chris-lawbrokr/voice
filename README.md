@@ -1,36 +1,28 @@
-# voice
+# Voice
 
-Monorepo with a Next.js frontend (Vercel) and Python FastAPI backend (GCP), connected to an existing PostgreSQL database.
+FastAPI service for the voice lead-pulling pipeline.
 
-## Structure
+## Prerequisites
 
-```
-voice/
-├── frontend/     # Next.js (TypeScript) — deployed to Vercel
-├── api/          # FastAPI (Python) — deployed to GCP Cloud Run
-├── .claude/      # Claude Code configuration
-├── .serena/      # Serena LSP configuration
-└── .taskmaster/  # Task Master configuration
-```
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/)
 
-## Getting Started
-
-### Frontend
+## Setup
 
 ```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### API
-
-```bash
-cd api
 uv sync
+```
+
+## Run
+
+```bash
 uv run uvicorn app.main:app --reload
 ```
 
-## Environment Variables
+The server starts on `http://127.0.0.1:8000`. You should see a counter logging every second in the terminal.
 
-Copy `.env.example` to `.env` in each service directory and fill in the values.
+## Health Check
+
+```bash
+curl http://127.0.0.1:8000/health
+```

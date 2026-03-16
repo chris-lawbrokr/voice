@@ -1,41 +1,32 @@
-# Dependencies
-node_modules/
-__pycache__/
-*.pyc
-.venv/
-venv/
+# Environment and secrets
+.env
+.env.*
+!.env.example
 
-# Build outputs
-.next/
-out/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
 dist/
 build/
-*.egg-info/
 
-# Environment
-.env
-.env.local
-.env.*.local
+# Virtual environments
+.venv/
+venv/
 
 # IDE
 .idea/
 .vscode/
-*.sw?
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
 
 # Logs
-logs/
-*.log*
-
-# OS
-.DS_Store
-Thumbs.db
-
-# AI tools config (track these)
-!.serena
-!.claude
-!.taskmaster
-!.github
-
-# Secrets
-*.pem
-service-account-key.json
+*.log
