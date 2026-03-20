@@ -1,6 +1,8 @@
-def main():
-    print("Hello from voice!")
+from fastapi import FastAPI
+
+app = FastAPI()
 
 
-if __name__ == "__main__":
-    main()
+@app.get("/")
+async def hello():
+    return {"message": "Hello, World!"}
