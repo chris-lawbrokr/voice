@@ -9,6 +9,12 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+
+@app.on_event("startup")
+async def startup():
+    logger.info("Hello, World! Voice intake server is running.")
+
+
 SYSTEM_PROMPT = """You are a friendly intake assistant for a medical clinic. Your job is to collect basic information from the caller for a follow-up appointment.
 
 You must collect the following information:
