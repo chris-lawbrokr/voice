@@ -3,6 +3,7 @@ from fastapi import APIRouter, Request
 from .base import Agent
 from .custom_intake import CustomIntakeAgent
 from .intake import IntakeAgent
+from .prescription_refill import PrescriptionRefillAgent
 from .triage import TriageAgent
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -11,6 +12,7 @@ REGISTRY: dict[str, Agent] = {
     "intake": IntakeAgent(),
     "triage": TriageAgent(),
     "custom_intake": CustomIntakeAgent(),
+    "prescription_refill": PrescriptionRefillAgent(),
 }
 
 
