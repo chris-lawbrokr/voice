@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 
 from .base import Agent
+from .appointment_followup import AppointmentFollowupAgent
 from .custom_intake import CustomIntakeAgent
 from .intake import IntakeAgent
 from .triage import TriageAgent
@@ -11,6 +12,7 @@ REGISTRY: dict[str, Agent] = {
     "intake": IntakeAgent(),
     "triage": TriageAgent(),
     "custom_intake": CustomIntakeAgent(),
+    "appointment_followup": AppointmentFollowupAgent(),
 }
 
 
