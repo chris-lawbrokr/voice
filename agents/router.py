@@ -4,6 +4,7 @@ from .base import Agent
 from .appointment_followup import AppointmentFollowupAgent
 from .custom_intake import CustomIntakeAgent
 from .intake import IntakeAgent
+from .lab_results import LabResultsAgent
 from .triage import TriageAgent
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -13,6 +14,7 @@ REGISTRY: dict[str, Agent] = {
     "triage": TriageAgent(),
     "custom_intake": CustomIntakeAgent(),
     "appointment_followup": AppointmentFollowupAgent(),
+    "lab_results": LabResultsAgent(),
 }
 
 
