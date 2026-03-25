@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 app.include_router(agents_router)
 
-
 @app.on_event("startup")
 async def startup():
     logger.info("Hello, World! Voice intake server is running.")
