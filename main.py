@@ -1,13 +1,19 @@
 import json
 import logging
+import uuid
 from datetime import datetime
 
 from fastapi import FastAPI, Request
+from openai import OpenAI
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+openai_client = OpenAI()
+
+# In-memory conversation store keyed by session_id
+conversations: dict[str, list[dict]] = {}
 
 
 @app.on_event("startup")
@@ -70,6 +76,76 @@ INTAKE_TOOL = {
 @app.get("/")
 async def health():
     return {"status": "ok"}
+
+
+@app.post("/test/chat")
+async def test_chat(request: Request):
+    """Text-based test endpoint for the intake conversation.
+
+    Send JSON: {"message": "your text", "session_id": "optional-existing-id"}
+    Returns: {"session_id": "...", "reply": "assistant response", "intake": null | {...}}
+    """
+    body = await request.json()
+    user_message = body.get("message", "")
+    session_id = body.get("session_id") or str(uuid.uuid4())
+
+    # Initialize conversation with system prompt if new session
+    if session_id not in conversations:
+        conversations[session_id] = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+        ]
+
+    messages = conversations[session_id]
+    messages.append({"role": "user", "content": user_message})
+
+    intake_data = None
+
+    # Loop to handle tool calls — the model may call a tool before replying
+    while True:
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            tools=[INTAKE_TOOL],
+        )
+
+        choice = response.choices[0]
+        assistant_message = choice.message
+
+        # Append the raw assistant message to history
+        messages.append(assistant_message.model_dump(exclude_none=True))
+
+        if choice.finish_reason == "tool_calls" and assistant_message.tool_calls:
+            for tool_call in assistant_message.tool_calls:
+                if tool_call.function.name == "save_intake":
+                    args = json.loads(tool_call.function.arguments)
+                    # Reuse existing save logic (pass a fake message with no call info)
+                    result = save_intake(args, {"call": {"customer": {"number": "test"}}})
+                    intake_data = args
+                else:
+                    result = "Unknown tool"
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result,
+                })
+            # Continue the loop so the model generates a user-facing reply after the tool call
+            continue
+
+        # No more tool calls — we have the final text reply
+        break
+
+    reply = assistant_message.content or ""
+    conversations[session_id] = messages
+
+    return {"session_id": session_id, "reply": reply, "intake": intake_data}
+
+
+@app.delete("/test/chat/{session_id}")
+async def delete_test_session(session_id: str):
+    """Delete a test conversation session."""
+    conversations.pop(session_id, None)
+    return {"status": "deleted"}
 
 
 @app.post("/webhook")
