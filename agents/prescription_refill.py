@@ -25,3 +25,28 @@ Guidelines:
 - Be friendly, patient, and HIPAA-conscious — never read back full date of birth or prescription details unprompted.
 
 Thank the caller and let them know their refill will typically be ready within 24-48 hours, and the pharmacy will notify them."""
+
+REFILL_REQUEST_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "save_refill_request",
+        "description": "Save a prescription refill request after collecting all required information from the caller.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "full_name": {"type": "string", "description": "Patient's full name as on prescription"},
+                "date_of_birth": {"type": "string", "description": "Patient's date of birth for verification"},
+                "medication_name": {"type": "string", "description": "Name of the medication to refill"},
+                "dosage": {"type": "string", "description": "Dosage of the medication (e.g. 10mg, 500mg)"},
+                "prescription_number": {"type": "string", "description": "Prescription/Rx number from the label, if available"},
+                "pharmacy_name": {"type": "string", "description": "Name of the pharmacy for the refill"},
+                "pharmacy_location": {"type": "string", "description": "Location/address of the pharmacy"},
+                "additional_medications": {
+                    "type": "string",
+                    "description": "Any other medications to refill at the same time, or 'none'",
+                },
+            },
+            "required": ["full_name", "date_of_birth", "medication_name", "dosage", "pharmacy_name"],
+        },
+    },
+}
