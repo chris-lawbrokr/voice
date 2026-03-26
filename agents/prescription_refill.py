@@ -51,6 +51,16 @@ REFILL_REQUEST_TOOL = {
     },
 }
 
+# Common controlled substances (simplified reference list for demo purposes).
+# In production this would query a drug database / DEA schedule API.
+CONTROLLED_SUBSTANCES = {
+    "adderall", "ambien", "ativan", "codeine", "concerta", "dexedrine",
+    "diazepam", "fentanyl", "hydrocodone", "klonopin", "lorazepam",
+    "methadone", "morphine", "norco", "oxycodone", "oxycontin", "percocet",
+    "ritalin", "tramadol", "valium", "vicodin", "vyvanse", "xanax",
+    "zolpidem",
+}
+
 CHECK_CONTROLLED_SUBSTANCE_TOOL = {
     "type": "function",
     "function": {
