@@ -86,7 +86,25 @@ class PrescriptionRefillAgent(Agent):
         """Route tool calls to the appropriate handler."""
         if name == "check_controlled_substance":
             return self._check_controlled_substance(args)
+        if name == "save_refill_request":
+            return self._save_refill_request(args)
         return ("Unknown tool", None)
+
+    @staticmethod
+    def _save_refill_request(args: dict) -> tuple[str, dict | None]:
+        refill = {
+            **args,
+            "status": "pending",
+            "created_at": datetime.now().isoformat(),
+        }
+        logger.info(f"Refill request saved: {json.dumps(refill, indent=2)}")
+        # TODO: persist to a database
+        return (
+            "Prescription refill request saved successfully. "
+            "The pharmacy will be notified and the refill should be ready within 24-48 hours. "
+            "The patient will receive a notification from the pharmacy when it is ready for pickup.",
+            args,
+        )
 
     @staticmethod
     def _check_controlled_substance(args: dict) -> tuple[str, dict | None]:
