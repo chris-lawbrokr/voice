@@ -6,6 +6,8 @@ from .base import Agent
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["PrescriptionRefillAgent"]
+
 SYSTEM_PROMPT = """You are a helpful prescription refill assistant for a medical clinic. Your job is to help callers request refills on their existing prescriptions.
 
 You must collect the following information:
