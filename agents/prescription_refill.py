@@ -75,3 +75,13 @@ CHECK_CONTROLLED_SUBSTANCE_TOOL = {
         },
     },
 }
+
+
+class PrescriptionRefillAgent(Agent):
+    name = "prescription_refill"
+    system_prompt = SYSTEM_PROMPT
+    tools = [REFILL_REQUEST_TOOL, CHECK_CONTROLLED_SUBSTANCE_TOOL]
+
+    def handle_tool_call(self, name: str, args: dict) -> tuple[str, dict | None]:
+        """Route tool calls to the appropriate handler."""
+        return ("Unknown tool", None)
