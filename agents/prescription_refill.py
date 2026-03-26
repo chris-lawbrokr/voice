@@ -50,3 +50,18 @@ REFILL_REQUEST_TOOL = {
         },
     },
 }
+
+CHECK_CONTROLLED_SUBSTANCE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "check_controlled_substance",
+        "description": "Check whether a medication is a controlled substance. Call this before saving a refill request to determine if the medication can be refilled or requires a new prescription.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "medication_name": {"type": "string", "description": "Name of the medication to check"},
+            },
+            "required": ["medication_name"],
+        },
+    },
+}
