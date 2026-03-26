@@ -84,4 +84,27 @@ class PrescriptionRefillAgent(Agent):
 
     def handle_tool_call(self, name: str, args: dict) -> tuple[str, dict | None]:
         """Route tool calls to the appropriate handler."""
+        if name == "check_controlled_substance":
+            return self._check_controlled_substance(args)
         return ("Unknown tool", None)
+
+    @staticmethod
+    def _check_controlled_substance(args: dict) -> tuple[str, dict | None]:
+        medication = args.get("medication_name", "").lower().strip()
+        is_controlled = medication in CONTROLLED_SUBSTANCES
+        result = {
+            "medication_name": args.get("medication_name"),
+            "is_controlled": is_controlled,
+        }
+        logger.info(f"Controlled substance check: {json.dumps(result)}")
+        if is_controlled:
+            return (
+                f"{args.get('medication_name')} is a controlled substance. "
+                "This medication cannot be refilled through the automated system. "
+                "The patient will need to contact their provider for a new prescription.",
+                result,
+            )
+        return (
+            f"{args.get('medication_name')} is not a controlled substance and is eligible for refill.",
+            result,
+        )
