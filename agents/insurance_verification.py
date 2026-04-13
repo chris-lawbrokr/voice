@@ -27,3 +27,22 @@ Guidelines:
 - Never read back the full member ID unprompted — confirm only the last 4 digits for security.
 
 Thank the caller and let them know the front desk will have their insurance on file for their next visit."""
+
+# Insurance plans accepted by the clinic (simplified for demo purposes).
+# In production this would query a payer/eligibility API.
+ACCEPTED_PLANS: dict[str, set[str]] = {
+    "aetna": {"ppo", "hmo", "pos"},
+    "blue cross blue shield": {"ppo", "hmo", "epo", "pos"},
+    "bcbs": {"ppo", "hmo", "epo", "pos"},
+    "cigna": {"ppo", "hmo", "epo"},
+    "humana": {"ppo", "hmo"},
+    "kaiser permanente": {"hmo"},
+    "medicare": {"medicare"},
+    "medicaid": {"medicaid"},
+    "unitedhealth": {"ppo", "hmo", "epo", "pos"},
+    "unitedhealthcare": {"ppo", "hmo", "epo", "pos"},
+    "anthem": {"ppo", "hmo", "epo"},
+    "molina": {"medicaid", "hmo"},
+    "centene": {"medicaid", "hmo"},
+    "tricare": {"hmo", "ppo"},
+}
